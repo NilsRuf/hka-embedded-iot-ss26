@@ -1,0 +1,11 @@
+# This is a simple Kconfig file defining a few application parameters.
+
+config LED0_BLINK_INTERVAL_MS
+    int "Blink interval of LED 0 in milliseconds."
+    default 1000
+
+
+# This needs to be in our toplevel Kconfig so Zephyr can find all the symbols.
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu
