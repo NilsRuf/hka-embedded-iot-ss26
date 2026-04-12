@@ -63,9 +63,32 @@ Try to implement the ultrasonic sensor as a device driver yourself.
 This is kind of advanced, though. Feel free to contact me for advice.
 
 Basically, what you need to do according to the [Zephyr docs](https://docs.zephyrproject.org/latest/kernel/drivers/index.html):
-1. Define a `grove,ultrasonic.yaml` file under an app-local `dts/bindings` folder.
-2. Add `grove Grove` as an entry to `dts/vendors.txt`.
-3. Specify the trigger pin in the DTS file (take a look at the Zephyr repo how they do it).
-4. Add a custom `ultrasonic.c` file that implements the [Sensor API](https://docs.zephyrproject.org/latest/hardware/peripherals/sensor/index.html) (only fetch and channel retrieval).
-5. Use the Zephyr macros to define a device driver.
+1. Define a `grove,ultrasonic.yaml` file under an app-local `dts/bindings/sensor` folder.
+2. Specify the trigger pin in the DTS file (take a look at the Zephyr repo how they do it).
+3. Add a custom `ultrasonic.c` file that implements the [Sensor API](https://docs.zephyrproject.org/latest/hardware/peripherals/sensor/index.html) (only fetch and channel retrieval).
+4. Define the required functions for `sensor_sample_fetch`, and `sensor_channel_get`.
+5. Use the Zephyr macros to define a device driver, most importantly:
+```c
+// This goes somewhere near the top of your file.
+#define DT_DRV_COMPAT grove_ultrasonic
 
+// ...
+
+// This API struct will be used by Zephyr to dispatch the API calls to your sensor device.
+// You need only implement those two functions.
+static DEVICE_API(sensor, grove_ranger_driver_api) = {
+    .sample_fetch = sample_fetch,
+    .channel_get = channel_get,
+};
+
+#define GROVE_ULTRASONIC_DEFINE(inst)                                   \
+    // Define your device data here                                     \
+    ...                                                                 \
+    SENSOR_DEVICE_DT_INST_DEFINE(inst, ultrasonic_init, NULL,           \
+            &data##inst, &config##inst, POST_KERNEL,                    \
+            CONFIG_SENSOR_INIT_PRIORITY, &ultrasonic_api)               \
+
+DT_INST_FOREACH_STATUS_OKAY(GROVE_ULTRASONIC_DEFINE);
+```
+
+Also, [this](https://academy.nordicsemi.com/courses/nrf-connect-sdk-intermediate/lessons/lesson-7-device-driver-dev/topic/exercise-1-13/) is a really good guide on how to implement your custom Zephyr sensor driver using the sensor device API.

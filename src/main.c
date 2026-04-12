@@ -2,16 +2,25 @@
 #include <stdio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/sensor.h>
 #include <zephyr/logging/log.h>
 
 // Define a log module and assign it a log priority.
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
 // Here we can access our prj.conf/Kconfig definitions
-#define BLINK_TIME_LED0_MS   CONFIG_LED0_BLINK_INTERVAL_MS
 #define BLINK_TIME_LED1_MS   CONFIG_LED1_BLINK_INTERVAL_MS
 #define BLINK_TIME_LED2_MS   CONFIG_LED2_BLINK_INTERVAL_MS
 #define BLINK_TIME_LED3_MS   CONFIG_LED3_BLINK_INTERVAL_MS
+
+// DEVICE_DT_GET can be used to retrieve a sensor device.
+// The grove ranger ultrasonic sensor has been implemented as a Zephyr sensor driver.
+static const struct device *ultrasonic_sensor = DEVICE_DT_GET(DT_NODELABEL(grove_ranger));
+
+// This semaphore is needed to signal the main thread from inside an ISR that a measurement has been
+// requested. It is not possible to perform blocking operations (like our ultrasonic sensor read)
+// inside an ISR.
+K_SEM_DEFINE(trigger_measurment, 0, 1);
 
 // Handles to all our LEDs.
 static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
@@ -31,14 +40,18 @@ static struct gpio_callback button1_callback;
 static struct gpio_callback button2_callback;
 static struct gpio_callback button3_callback;
 
+// Called when our LED blink timer expired.
 static void on_timer_expired(struct k_timer *timer);
+
+// Called when we stop the LED from blinking.
 static void on_timer_stopped(struct k_timer *timer);
-K_TIMER_DEFINE(led0_timer, on_timer_expired, on_timer_stopped);
+
+// Actual timer definitions.
 K_TIMER_DEFINE(led1_timer, on_timer_expired, on_timer_stopped);
 K_TIMER_DEFINE(led2_timer, on_timer_expired, on_timer_stopped);
 K_TIMER_DEFINE(led3_timer, on_timer_expired, on_timer_stopped);
 
-static bool led0_on = false;
+// Keeps track of the current LED state.
 static bool led1_on = false;
 static bool led2_on = false;
 static bool led3_on = false;
@@ -95,15 +108,10 @@ static void on_button_pressed(__maybe_unused const struct device *port,
                               __maybe_unused gpio_port_pins_t pins)
 {
     if (cb == &button0_callback) {
-        if (led0_on) {
-            LOG_INF("Turn LED 1 off");
-            k_timer_stop(&led0_timer);
-        } else {
-            LOG_INF("Turn LED 1 on");
-            k_timer_start(&led0_timer, K_NO_WAIT, K_MSEC(BLINK_TIME_LED0_MS));
-        }
-
-        led0_on = !led0_on;
+        // Here, we notify a waiter on the semaphore that we request a sensor sample.
+        // We also signal this through LED0 which has no blink timer any more.
+        k_sem_give(&trigger_measurment);
+        (void)gpio_pin_toggle_dt(&led0);
 
     } else if (cb == &button1_callback) {
         if (led1_on) {
@@ -139,9 +147,7 @@ static void on_button_pressed(__maybe_unused const struct device *port,
 
 static void on_timer_expired(struct k_timer *timer)
 {
-    if (timer == &led0_timer) {
-        (void)gpio_pin_toggle_dt(&led0);
-    } else if (timer == &led1_timer) {
+    if (timer == &led1_timer) {
         (void)gpio_pin_toggle_dt(&led1);
     } else if (timer == &led2_timer) {
         (void)gpio_pin_toggle_dt(&led2);
@@ -154,9 +160,7 @@ static void on_timer_expired(struct k_timer *timer)
 
 static void on_timer_stopped(struct k_timer *timer)
 {
-    if (timer == &led0_timer) {
-        (void)gpio_pin_configure_dt(&led0, GPIO_OUTPUT_INACTIVE);
-    } else if (timer == &led1_timer) {
+    if (timer == &led1_timer) {
         (void)gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
     } else if (timer == &led2_timer) {
         (void)gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
@@ -217,6 +221,37 @@ int main(void)
     if (ret != 0) {
         LOG_ERR("Failed to configure button3: %d", ret);
         return 0;
+    }
+
+    struct sensor_value distance;
+    for (;;) {
+        // Here, we wait until button0 has been pressed and we can perform a measurement.
+        ret = k_sem_take(&trigger_measurment, K_FOREVER);
+        if (ret != 0) {
+            continue;
+        }
+
+        // This triggers a measurement of the ultrasonic sensor.
+        ret = sensor_sample_fetch(ultrasonic_sensor);
+        if (ret != 0) {
+            LOG_ERR("Failed to request distance sample: %d", ret);
+            continue;
+        }
+
+        // Fetching a measurement and reading its results are independent operations.
+        // Here, we fetch the SENSOR_CHAN_DISTANCE sensor value - the only one we define.
+        ret = sensor_channel_get(ultrasonic_sensor, SENSOR_CHAN_DISTANCE, &distance);
+        if (ret != 0) {
+            LOG_ERR("Failed to read distance sample: %d", ret);
+            continue;
+        }
+
+        // Disable LED0 and print the sensor value.
+        // Sensor values are represented as two integers.
+        // val1 is the integer and val2 is the fractional part scaled by 1e6.
+        // Our unit here is meters.
+        (void)gpio_pin_toggle_dt(&led0);
+        LOG_INF("Read distance: %d.%dm", distance.val1, distance.val2);
     }
 
     return 0;
