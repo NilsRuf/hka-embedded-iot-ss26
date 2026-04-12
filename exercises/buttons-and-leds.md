@@ -12,7 +12,8 @@ for toggling a _Light Emitting Diode (LED)_.
 
 ## Exercise 1: Make it interactive
 The devkit has four LEDs and four buttons.
-The LEDs are labeled `led0`, `led1`, and so on while the buttons are named `button0` to `button3`.
+The LEDs are labeled `led0`, `led1`, and so on while the buttons are aliased as `sw0` to `sw3` while
+their `DT_NODELABEL` references are `button0` to `button3`.
 
 - Use [Zephyr's GPIO API](https://docs.zephyrproject.org/latest/doxygen/html/group__gpio__interface.html)
 to turn the LEDs on when there corresponding button is pressed.

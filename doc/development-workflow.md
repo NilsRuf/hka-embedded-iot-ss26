@@ -25,8 +25,29 @@ west flash --recover
 
 Debugging is easy as well:
 ```bash
+# Attach GDB and start a session
 west debug
+
+# Attach GDB and expose the session on a local port for IDE integration
+west debugserver
 ```
+
+If you want to flash using _OpenOCD_, you have to add the `-r openocd` flag to all commands talking
+to the device.
+
+If you need to recover the device using OpenOCD, run
+```bash
+$HOME/zephyr-sdk-0.17.4/sysroots/x86_64-pokysdk-linux/usr/bin/openocd \
+  -s /home/nils/zephyr-sdk-0.17.4/sysroots/x86_64-pokysdk-linux/usr/share/openocd/scripts \
+  -c "source [find interface/jlink.cfg]" \
+  -c "transport select swd" \
+  -c "source [find target/nrf52.cfg]" \
+  -c "init" \
+  -c "nrf52_recover" \
+  -c "shutdown"
+```
+
+> **Note:** You may need to replace the path to your Zephyr SDK in the above command.
 
 There are also some nice VS Code plugins btw.
 
