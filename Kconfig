@@ -4,6 +4,18 @@ config LED0_BLINK_INTERVAL_MS
     int "Blink interval of LED 0 in milliseconds."
     default 1000
 
+config LED1_BLINK_INTERVAL_MS
+    int "Blink interval of LED 1 in milliseconds."
+    default 330
+
+config LED2_BLINK_INTERVAL_MS
+    int "Blink interval of LED 2 in milliseconds."
+    default 600
+
+config LED3_BLINK_INTERVAL_MS
+    int "Blink interval of LED 3 in milliseconds."
+    default 250
+
 
 # This needs to be in our toplevel Kconfig so Zephyr can find all the symbols.
 menu "Zephyr Kernel"
