@@ -40,14 +40,18 @@ With the math out of the way, we can actually measure some distances!
       like this:
 ```c
 / {
-    ultrasonic_signal: ultrasonic_signal {
-        gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+    custom_gpios {
+        compatible = "gpio-keys";
+
+        ultrasonic_signal: ultrasonic_signal {
+            gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+        };
     };
 };
 ```
     - Send a trigger of at least `10us` on the pin.
     - Reconfigure the pin as input and register interrupts on it.
-    - Measure the pulse response using `k_cycle_get64` from the [Kernel Timing API](https://docs.zephyrproject.org/latest/kernel/services/timing/clocks.html)
+    - Measure the pulse response using `k_cycle_get32` from the [Kernel Timing API](https://docs.zephyrproject.org/latest/kernel/services/timing/clocks.html)
     - Convert that measurement into a distance
     - Log that to the console
     - Trigger a measurement when the button is pressed.
