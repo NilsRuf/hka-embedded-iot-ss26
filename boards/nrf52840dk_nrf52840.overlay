@@ -1,3 +1,11 @@
+/ {
+    grove_ranger: grove_ranger {
+        compatible = "grove-ranger";
+        status = "okay";
+        sig-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+    };
+};
+
 &i2c0 {
     status = "okay";
     /*

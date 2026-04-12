@@ -1,0 +1,2 @@
+# We can source our ultrasonic driver directly.
+rsource "sensor/grove_ranger/Kconfig"
