@@ -5,17 +5,17 @@ menu "Zephyr Kernel"
 source "Kconfig.zephyr"
 endmenu
 
-config LED1_BLINK_INTERVAL_MS
-    int "Blink interval of LED 1 in milliseconds."
-    default 330
+config ENV_READING_THREAD_PRIORITY
+    int "Thread priority for our environment readings."
+    default 10
 
-config LED2_BLINK_INTERVAL_MS
-    int "Blink interval of LED 2 in milliseconds."
-    default 600
+config ENV_READING_STACK_SIZE
+    int "Stack size for environment reading thread."
+    default 1024
 
-config LED3_BLINK_INTERVAL_MS
-    int "Blink interval of LED 3 in milliseconds."
-    default 250
+config ENV_READING_DEFAULT_MEASUREMENT_INTERVAL_MS
+    int "Default measurement interval of the environment sensors in milliseconds."
+    default 4000
 
 # Include our custom drivers (for e.g. ultrasonic sensor)
 rsource "drivers/Kconfig"

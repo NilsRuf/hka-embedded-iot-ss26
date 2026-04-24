@@ -1,24 +1,18 @@
 
-#include <stdio.h>
-#include <zephyr/kernel.h>
+#include "env_reading.h"
+
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/sensor.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/zbus/zbus.h>
 
 // Define a log module and assign it a log priority.
 LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 
-// Here we can access our prj.conf/Kconfig definitions
-#define BLINK_TIME_LED1_MS   CONFIG_LED1_BLINK_INTERVAL_MS
-#define BLINK_TIME_LED2_MS   CONFIG_LED2_BLINK_INTERVAL_MS
-#define BLINK_TIME_LED3_MS   CONFIG_LED3_BLINK_INTERVAL_MS
-
 // DEVICE_DT_GET can be used to retrieve a sensor device.
 // The grove ranger ultrasonic sensor has been implemented as a Zephyr sensor driver.
 static const struct device *ultrasonic_sensor = DEVICE_DT_GET(DT_NODELABEL(grove_ranger));
-
-// Our pressure and temperature sensor.
-static const struct device *env_sensor = DEVICE_DT_GET(DT_NODELABEL(bmp280));
 
 // This semaphore is needed to signal the main thread from inside an ISR that a measurement has been
 // requested. It is not possible to perform blocking operations (like our ultrasonic sensor read)
@@ -27,37 +21,16 @@ K_SEM_DEFINE(trigger_measurment, 0, 1);
 
 // Handles to all our LEDs.
 static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
-static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(DT_ALIAS(led1), gpios);
-static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(DT_ALIAS(led2), gpios);
-static const struct gpio_dt_spec led3 = GPIO_DT_SPEC_GET(DT_ALIAS(led3), gpios);
 
 // Handles to all our buttons.
 static const struct gpio_dt_spec button0 = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);
-static const struct gpio_dt_spec button1 = GPIO_DT_SPEC_GET(DT_ALIAS(sw1), gpios);
-static const struct gpio_dt_spec button2 = GPIO_DT_SPEC_GET(DT_ALIAS(sw2), gpios);
-static const struct gpio_dt_spec button3 = GPIO_DT_SPEC_GET(DT_ALIAS(sw3), gpios);
 
 // GPIO callback handlers for the buttons
 static struct gpio_callback button0_callback;
-static struct gpio_callback button1_callback;
-static struct gpio_callback button2_callback;
-static struct gpio_callback button3_callback;
 
-// Called when our LED blink timer expired.
-static void on_timer_expired(struct k_timer *timer);
-
-// Called when we stop the LED from blinking.
-static void on_timer_stopped(struct k_timer *timer);
-
-// Actual timer definitions.
-K_TIMER_DEFINE(led1_timer, on_timer_expired, on_timer_stopped);
-K_TIMER_DEFINE(led2_timer, on_timer_expired, on_timer_stopped);
-K_TIMER_DEFINE(led3_timer, on_timer_expired, on_timer_stopped);
-
-// Keeps track of the current LED state.
-static bool led1_on = false;
-static bool led2_on = false;
-static bool led3_on = false;
+static void on_env_measurement(const struct zbus_channel *chan);
+ZBUS_LISTENER_DEFINE(env_listener, on_env_measurement);
+ZBUS_CHAN_ADD_OBS(env_reading_measurement_channel, env_listener, 0);
 
 static int configure_led(const struct gpio_dt_spec *led, const bool on)
 {
@@ -92,8 +65,8 @@ static int configure_button(const struct gpio_dt_spec *button, struct gpio_callb
     }
 
     // Next, we enable interrupts on the pin.
-    ret = gpio_pin_interrupt_configure_dt(button,
-            both_edges ? GPIO_INT_EDGE_BOTH : GPIO_INT_EDGE_TO_ACTIVE);
+    ret = gpio_pin_interrupt_configure_dt(button, both_edges ? GPIO_INT_EDGE_BOTH
+                                                             : GPIO_INT_EDGE_TO_ACTIVE);
     if (ret != 0) {
         return ret;
     }
@@ -106,8 +79,7 @@ static int configure_button(const struct gpio_dt_spec *button, struct gpio_callb
     return gpio_add_callback(button->port, callback_data);
 }
 
-static void on_button_pressed(__maybe_unused const struct device *port,
-                              struct gpio_callback *cb,
+static void on_button_pressed(__maybe_unused const struct device *port, struct gpio_callback *cb,
                               __maybe_unused gpio_port_pins_t pins)
 {
     if (cb == &button0_callback) {
@@ -115,62 +87,6 @@ static void on_button_pressed(__maybe_unused const struct device *port,
         // We also signal this through LED0 which has no blink timer any more.
         k_sem_give(&trigger_measurment);
         (void)gpio_pin_toggle_dt(&led0);
-
-    } else if (cb == &button1_callback) {
-        if (led1_on) {
-            LOG_INF("Turn LED 2 off");
-            k_timer_stop(&led1_timer);
-        } else {
-            LOG_INF("Turn LED 2 on");
-            k_timer_start(&led1_timer, K_NO_WAIT, K_MSEC(BLINK_TIME_LED1_MS));
-        }
-        led1_on = !led1_on;
-    } else if (cb == &button2_callback) {
-        if (led2_on) {
-            LOG_INF("Turn LED 3 off");
-            k_timer_stop(&led2_timer);
-        } else {
-            LOG_INF("Turn LED 3 on");
-            k_timer_start(&led2_timer, K_NO_WAIT, K_MSEC(BLINK_TIME_LED2_MS));
-        }
-        led2_on = !led2_on;
-    } else if (cb == &button3_callback) {
-        if (led3_on) {
-            LOG_INF("Turn LED 4 off");
-            k_timer_stop(&led3_timer);
-        } else {
-            LOG_INF("Turn LED 4 on");
-            k_timer_start(&led3_timer, K_NO_WAIT, K_MSEC(BLINK_TIME_LED3_MS));
-        }
-        led3_on = !led3_on;
-    } else {
-        LOG_ERR("Invalid gpio callback");
-    }
-}
-
-static void on_timer_expired(struct k_timer *timer)
-{
-    if (timer == &led1_timer) {
-        (void)gpio_pin_toggle_dt(&led1);
-    } else if (timer == &led2_timer) {
-        (void)gpio_pin_toggle_dt(&led2);
-    } else if (timer == &led3_timer) {
-        (void)gpio_pin_toggle_dt(&led3);
-    } else {
-        // Never happens
-    }
-}
-
-static void on_timer_stopped(struct k_timer *timer)
-{
-    if (timer == &led1_timer) {
-        (void)gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
-    } else if (timer == &led2_timer) {
-        (void)gpio_pin_configure_dt(&led2, GPIO_OUTPUT_INACTIVE);
-    } else if (timer == &led3_timer) {
-        (void)gpio_pin_configure_dt(&led3, GPIO_OUTPUT_INACTIVE);
-    } else {
-        // Never happens
     }
 }
 
@@ -184,45 +100,9 @@ int main(void)
         return 0;
     }
 
-    ret = configure_led(&led1, false);
-    if (ret != 0) {
-        LOG_ERR("Failed to configure led1: %d", ret);
-        return 0;
-    }
-
-    ret = configure_led(&led2, false);
-    if (ret != 0) {
-        LOG_ERR("Failed to configure led2: %d", ret);
-        return 0;
-    }
-
-    ret = configure_led(&led3, false);
-    if (ret != 0) {
-        LOG_ERR("Failed to configure led3: %d", ret);
-        return 0;
-    }
-
     ret = configure_button(&button0, &button0_callback, on_button_pressed, false);
     if (ret != 0) {
         LOG_ERR("Failed to configure button0: %d", ret);
-        return 0;
-    }
-
-    ret = configure_button(&button1, &button1_callback, on_button_pressed, false);
-    if (ret != 0) {
-        LOG_ERR("Failed to configure button1: %d", ret);
-        return 0;
-    }
-
-    ret = configure_button(&button2, &button2_callback, on_button_pressed, false);
-    if (ret != 0) {
-        LOG_ERR("Failed to configure button2: %d", ret);
-        return 0;
-    }
-
-    ret = configure_button(&button3, &button3_callback, on_button_pressed, false);
-    if (ret != 0) {
-        LOG_ERR("Failed to configure button3: %d", ret);
         return 0;
     }
 
@@ -231,38 +111,13 @@ int main(void)
         return 0;
     }
 
-    if (!device_is_ready(env_sensor)) {
-        LOG_ERR("Environment sensor is not ready!");
-        return 0;
-    }
-
     LOG_INF("Sensors are ready :)");
 
     struct sensor_value distance;
-    struct sensor_value pressure;
-    struct sensor_value temperature;
     for (;;) {
         // Here, we wait until button0 has been pressed and we can perform a measurement.
         ret = k_sem_take(&trigger_measurment, K_FOREVER);
         if (ret != 0) {
-            continue;
-        }
-
-        ret = sensor_sample_fetch(env_sensor);
-        if (ret != 0) {
-            LOG_ERR("Failed to request environment measurement: %d", ret);
-            continue;
-        }
-
-        ret = sensor_channel_get(env_sensor, SENSOR_CHAN_PRESS, &pressure);
-        if (ret != 0) {
-            LOG_ERR("Failed to read pressure measurement: %d", ret);
-            continue;
-        }
-
-        ret = sensor_channel_get(env_sensor, SENSOR_CHAN_AMBIENT_TEMP, &temperature);
-        if (ret != 0) {
-            LOG_ERR("Failed to read pressure measurement: %d", ret);
             continue;
         }
 
@@ -287,9 +142,13 @@ int main(void)
         // Our unit here is meters.
         (void)gpio_pin_toggle_dt(&led0);
         LOG_INF("Read distance: %d.%dm", distance.val1, distance.val2);
-        LOG_INF("Read pressure: %d.%dkPa", pressure.val1, pressure.val2);
-        LOG_INF("Read temperature: %d.%d°C", temperature.val1, temperature.val2);
     }
 
     return 0;
+}
+
+static void on_env_measurement(const struct zbus_channel *chan)
+{
+    const struct env_reading *reading = zbus_chan_const_msg(chan);
+    LOG_INF("Sample is %s", reading->status == ENV_READING_VALID ? "valid" : "invalid");
 }

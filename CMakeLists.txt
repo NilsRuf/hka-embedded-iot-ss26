@@ -12,6 +12,7 @@ project(NONE)
 target_sources(app PRIVATE
     src/main.c
     # Other source files go here
+    src/env_reading.c
     )
 
 # Add everything under include/ to the include path.
