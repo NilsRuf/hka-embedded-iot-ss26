@@ -55,6 +55,22 @@ Plug the _BOSCH BMP280_ sensor with the **VDD** pin connected to **P0.02** into 
 - Periodically read the sensor values using the [Sensor API](https://docs.zephyrproject.org/latest/hardware/peripherals/sensor/index.html)
 - Log everything of course.
 
+**Hint:** You do not have to configure those static GPIO pins in your C code. There is a convenient
+devicetree feature called _GPIO hogs_:
+```
+&gpio0 {
+    status = "okay";
+
+    bosch_vdd_pin {
+        gpio-hog;
+        output-high;
+        gpios = <2 GPIO_ACTIVE_HIGH>;
+    };
+};
+```
+
 ## Exercise 3 (ADVANCED): Message bus
 Read about [Zephyr's message bus (ZBUS)](https://docs.zephyrproject.org/latest/services/zbus/index.html).
 Then implement a measurement channel that provides you with the latest measurements.
+
+> We will also do this in class ;)
