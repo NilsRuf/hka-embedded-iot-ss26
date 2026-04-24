@@ -17,6 +17,9 @@ LOG_MODULE_REGISTER(main, CONFIG_LOG_DEFAULT_LEVEL);
 // The grove ranger ultrasonic sensor has been implemented as a Zephyr sensor driver.
 static const struct device *ultrasonic_sensor = DEVICE_DT_GET(DT_NODELABEL(grove_ranger));
 
+// Our pressure and temperature sensor.
+static const struct device *env_sensor = DEVICE_DT_GET(DT_NODELABEL(bmp280));
+
 // This semaphore is needed to signal the main thread from inside an ISR that a measurement has been
 // requested. It is not possible to perform blocking operations (like our ultrasonic sensor read)
 // inside an ISR.
@@ -223,11 +226,43 @@ int main(void)
         return 0;
     }
 
+    if (!device_is_ready(ultrasonic_sensor)) {
+        LOG_ERR("Environment sensor is not ready!");
+        return 0;
+    }
+
+    if (!device_is_ready(env_sensor)) {
+        LOG_ERR("Environment sensor is not ready!");
+        return 0;
+    }
+
+    LOG_INF("Sensors are ready :)");
+
     struct sensor_value distance;
+    struct sensor_value pressure;
+    struct sensor_value temperature;
     for (;;) {
         // Here, we wait until button0 has been pressed and we can perform a measurement.
         ret = k_sem_take(&trigger_measurment, K_FOREVER);
         if (ret != 0) {
+            continue;
+        }
+
+        ret = sensor_sample_fetch(env_sensor);
+        if (ret != 0) {
+            LOG_ERR("Failed to request environment measurement: %d", ret);
+            continue;
+        }
+
+        ret = sensor_channel_get(env_sensor, SENSOR_CHAN_PRESS, &pressure);
+        if (ret != 0) {
+            LOG_ERR("Failed to read pressure measurement: %d", ret);
+            continue;
+        }
+
+        ret = sensor_channel_get(env_sensor, SENSOR_CHAN_AMBIENT_TEMP, &temperature);
+        if (ret != 0) {
+            LOG_ERR("Failed to read pressure measurement: %d", ret);
             continue;
         }
 
@@ -252,6 +287,8 @@ int main(void)
         // Our unit here is meters.
         (void)gpio_pin_toggle_dt(&led0);
         LOG_INF("Read distance: %d.%dm", distance.val1, distance.val2);
+        LOG_INF("Read pressure: %d.%dkPa", pressure.val1, pressure.val2);
+        LOG_INF("Read temperature: %d.%d°C", temperature.val1, temperature.val2);
     }
 
     return 0;
