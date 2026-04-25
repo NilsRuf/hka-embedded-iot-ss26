@@ -85,3 +85,4 @@ Then implement a measurement channel that provides you with the latest measureme
 - Attach subscriber to channel: `ZBUS_CHAN_ADD_OBS(channel, subscriber, prio)`
 - Publish message: `int zbus_chan_pub(&chan, &msg, K_NO_WAIT);`
 - Read message from channel: `int zbus_sub_wait_msg(&sub, &chan_ptr, &msg, K_FOREVER);`
+- In `prj.conf` set `CONFIG_ZBUS=y` and `CONFIG_ZBUS_MSG_SUBSCRIBER=y`
