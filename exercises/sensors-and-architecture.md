@@ -74,3 +74,11 @@ Read about [Zephyr's message bus (ZBUS)](https://docs.zephyrproject.org/latest/s
 Then implement a measurement channel that provides you with the latest measurements.
 
 > We will also do this in class ;)
+
+## Relevant functions and APIs:
+- Define channel `ZBUS_CHAN_DEFINE(name, type, NULL, NULL, ZBUS_OBSERVERS_EMPTY, ZBUS_MSG_INIT(0));`
+- Declare channel `ZBUS_CHAN_DECLARE(name);`
+- Define MSG subscriber: `ZBUS_MSG_SUBSCRIBER_DEFINE(name)`
+- Attach subscriber to channel: `ZBUS_CHAN_ADD_OBS(channel, subscriber, prio)`
+- Publish message: `int zbus_chan_pub(&chan, &msg, K_NO_WAIT);`
+- Read message from channel: `int zbus_sub_wait_msg(&sub, &chan_ptr, &msg, K_FOREVER);`
