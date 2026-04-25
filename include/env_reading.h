@@ -22,4 +22,7 @@ struct env_reading {
 /// Channel where environment measurements are published.
 ZBUS_CHAN_DECLARE(env_reading_measurement_channel);
 
+/// Channel where environment measurements can be triggered.
+ZBUS_CHAN_DECLARE(env_reading_measurement_trigger);
+
 #endif

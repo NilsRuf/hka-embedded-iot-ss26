@@ -24,9 +24,11 @@ static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 
 // Handles to all our buttons.
 static const struct gpio_dt_spec button0 = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);
+static const struct gpio_dt_spec button1 = GPIO_DT_SPEC_GET(DT_ALIAS(sw1), gpios);
 
 // GPIO callback handlers for the buttons
 static struct gpio_callback button0_callback;
+static struct gpio_callback button1_callback;
 
 static void on_env_measurement(const struct zbus_channel *chan);
 ZBUS_LISTENER_DEFINE(env_listener, on_env_measurement);
@@ -88,6 +90,16 @@ static void on_button_pressed(__maybe_unused const struct device *port, struct g
         k_sem_give(&trigger_measurment);
         (void)gpio_pin_toggle_dt(&led0);
     }
+
+    if (cb == &button1_callback) {
+        // Here, we notify a waiter on the semaphore that we request a sensor sample.
+        // We also signal this through LED0 which has no blink timer any more.
+        int msg = 1;
+        int err = zbus_chan_pub(&env_reading_measurement_trigger, &msg, K_NO_WAIT);
+        if (err != 0) {
+            LOG_ERR("Failed to publish measurement trigger: %d", err);
+        }
+    }
 }
 
 int main(void)
@@ -103,6 +115,12 @@ int main(void)
     ret = configure_button(&button0, &button0_callback, on_button_pressed, false);
     if (ret != 0) {
         LOG_ERR("Failed to configure button0: %d", ret);
+        return 0;
+    }
+
+    ret = configure_button(&button1, &button1_callback, on_button_pressed, false);
+    if (ret != 0) {
+        LOG_ERR("Failed to configure button1: %d", ret);
         return 0;
     }
 
