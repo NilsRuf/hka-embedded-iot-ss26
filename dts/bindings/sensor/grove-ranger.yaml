@@ -1,0 +1,12 @@
+description: Grove ultrasonic ranger.
+
+compatible: "grove-ranger"
+
+include: sensor-device.yaml
+
+properties:
+  sig-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Combined trigger and echo pin.

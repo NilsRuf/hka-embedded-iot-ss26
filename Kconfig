@@ -1,9 +1,20 @@
-# This is a simple Kconfig file defining a few application parameters.
+# Adjust the values as needed
 
-config LED0_BLINK_INTERVAL_MS
-    int "Blink interval of LED 0 in milliseconds."
-    default 1000
+config COMM_THREAD_STACK_SIZE
+    int "Stack size for comm thread."
+    default 4096
 
+config COMM_THREAD_PRIO
+    int "Priority for the communication thread."
+    default 4
+
+config ENV_THREAD_STACK_SIZE
+    int "Stack size for env reading thread."
+    default 1024
+
+config ENV_THREAD_PRIO
+    int "Priority for the environment reading thread."
+    default 4
 
 # This needs to be in our toplevel Kconfig so Zephyr can find all the symbols.
 menu "Zephyr Kernel"

@@ -1,0 +1,169 @@
+<h1 id="final-project">Final Project</h1>
+<p>The goal of the final project is to create a sensor device that sends
+out measurement values via BLE and can be connected via a client like
+your phone. It is built based on what we have covered in the practice
+sessions. This code can be reused.</p>
+<p>You can use the contents of branch <code>template</code> as a
+start.</p>
+<p><strong>Mandatory requirements</strong> are - well - mandatory. It is
+a lot about basic code quality and hygiene as well as some core
+features. Implement those first.</p>
+<p>Then, choose <strong>at least two</strong> optional feature to
+implement.</p>
+<p>If you have questions concerning the implementation, write an email
+to <code>runi0001@h-ka.de</code>.</p>
+<p>Submit your code before <strong>Sunday, 31.05.2026 23:59</strong> as
+a zipped archive. Your archive <strong>must also include the
+<code>.git</code> folder</strong> of your repository.</p>
+<h1 id="mandatory-requirements-50p">Mandatory requirements (50P)</h1>
+<h2 id="code-quality-5p">Code quality (5P)</h2>
+<ul>
+<li>The code has to compile without warnings from <strong>your</strong>
+code (Zephyr warnings not originating from your code don’t matter).</li>
+<li>Every return value needs to be checked for errors or casted to void
+with a comment explaining why this is okay.</li>
+<li>Every function in a header file must contain descriptions for each
+parameter and the return value.</li>
+<li>General coding best practices (split your code into functions,
+sensible variable naming, a few comments, etc.) should be applied.</li>
+</ul>
+<h2 id="architecture-10p">Architecture (10P)</h2>
+<ul>
+<li>Focus on a clean design with your code structured in modules
+(different C files) and different threads (where it makes sense).</li>
+<li>Design a proper way of communication between the threads
+(e.g. message bus or something else)</li>
+</ul>
+<h2 id="logging-2p">Logging (2P)</h2>
+<ul>
+<li>All system events (measurements, config changes, sending data, etc.
+must be logged to the console).</li>
+<li>All errors have to be logged at least once (either with a warning or
+error log - depending on the severity).</li>
+</ul>
+<h2 id="measurements-10p">Measurements (10P)</h2>
+<ul>
+<li>The device has two sensor sources: our ultrasonic sensor and the
+Bosch BMP280 environmental temperature and pressure sensor.</li>
+<li>The environment sensor has an initial measurement interval of 10
+seconds. This value must be configurable via a Kconfig option.</li>
+<li>The environment sensor has a <em>fast mode</em> which triggers a
+measurement every 5 seconds. It is activated by pressing
+<code>button0</code> and deactivated by pressing <code>button0</code>
+again.</li>
+<li>If fast mode is active, let LED0 blink with a rate of 2Hz (once per
+second). In normal mode the blink interval of LED0 should be 1Hz.</li>
+<li>The ultrasonic sensor has a default measurement interval of 2s. Make
+this configurable via Kconfig.</li>
+<li>Let LED1 blink for 500ms after each measurement (either
+environmental or ultrasonic sensor).</li>
+</ul>
+<h2 id="bluetooth-functionality-10p">Bluetooth functionality (10P)</h2>
+<ul>
+<li>Make your device connectable.</li>
+<li>Show the connection status via LED2: off -&gt; disconnected, on
+-&gt; connected</li>
+<li>Define a service comprising <strong>three read-write
+characteristics</strong> for distance (ultrasonic), temperature, and
+pressure, as well as <strong>three write-only characteristics</strong>
+for setting the ultrasonic measurement interval, as well as the standard
+and fast modes for the environment sensor.</li>
+<li>Each value is encoded in 16 bits. Use a signed value for temperature
+and an unsigned value for pressure, and distance, respectively.
+<ul>
+<li>Formats are as follows:
+<ul>
+<li>Distance in millimeters (<code>uint16_t</code>)</li>
+<li>Temperature in celsius divided by 100 as <code>int16_t</code>,
+i.e. 23.58°C -&gt; 2358</li>
+<li>Pressure in deci-Pascal, i.e. 100.58kPa -&gt; 10058</li>
+<li>All writeable intervals are in milliseconds.</li>
+</ul></li>
+</ul></li>
+</ul>
+<h2 id="system-reset-3p">System reset (3P)</h2>
+<ul>
+<li>Pressing <code>button3</code> resets the system to its default
+configuration (measurement timers.)
+<ul>
+<li>Make sure the updated state is also visible via BLE!</li>
+</ul></li>
+</ul>
+<h2 id="documentation-10p">Documentation (10P)</h2>
+<ul>
+<li>Create a markdown file under <code>docs</code> explaining your
+architecture (e.g. which modules exist, what they do, how they
+interact).</li>
+<li>Add a figure showing the different modules/threads and their
+interaction.</li>
+<li>Keep it short - just the essentials ;)</li>
+<li>Document, which optional features you implemented and explain how to
+use those features if you created your own.</li>
+</ul>
+<h1 id="optional-features-20p">Optional Features (20P)</h1>
+<p>Choose at <strong>least two</strong> optional features. You can also
+come up with features on your own. Make sure to document these. If you
+are not sure whether your idea counts as a feature, just ask (it usually
+does…).</p>
+<h2 id="ble-temperature-alarms-10p-1p">BLE Temperature Alarms (10P +
+1P)</h2>
+<ul>
+<li>Add a NOTIFY characteristic to your service which sends an alarm to
+the connected client if the ambient temperature has exceeded or fallen
+below a certain threshold.</li>
+<li>Configure the thresholds via Kconfig option.</li>
+<li>Use only one characteristic to represent all states (normal,
+freezing, or hot).</li>
+<li>Only drop back to normal if the temperature measurement is in range
+for a full minute.</li>
+<li>Turn LED3 on if the device is outside its specs.</li>
+<li><strong>Bonus Point:</strong> You get an extra point if you make the
+limits configurable via your service.</li>
+</ul>
+<h2 id="presence-detection-kind-of-10p-1p">Presence Detection (kind of)
+(10P + 1P)</h2>
+<ul>
+<li>Imagine the ultrasonic sensor is directed at a door.</li>
+<li>Detect if the door has been opened.</li>
+<li>For as long as the door is open, turn LED1 on (LED1 is removed of
+its previous functionality). Make sure to docuent this!</li>
+<li>If the door is open, switch to fast measurement mode.</li>
+<li>Bonus point: Add a NOTIFY characteristic to BLE indicating when the
+door is open.</li>
+</ul>
+<h2 id="pairing-10p">Pairing (10P)</h2>
+<ul>
+<li>Make your BLE device pairable. Take a look at
+<code>struct bt_conn_auth_cb</code> in
+<code>zephyr/bluetooth/conn.h</code> for that.</li>
+<li>Use <code>button1</code> to accept a connection.</li>
+</ul>
+<h2 id="persistence-10p">Persistence (10P)</h2>
+<ul>
+<li>Use the <a
+href="https://docs.zephyrproject.org/latest/services/settings/index.html">Zephyr’s
+settings</a> subsystem to persist all measurement intervals and other
+system configuration settings to persistent storage (flash).</li>
+<li>Make sure to load the settings at boot and distribute them to the
+right places.</li>
+<li><strong>Hint:</strong> Take inspiration from
+<code>zephyr/samples/subsys/settings</code> (this even works on our
+board)</li>
+</ul>
+<h2 id="shell-control-10p">Shell Control (10P)</h2>
+<ul>
+<li>Make all your options (update intervals, etc.) configurable via the
+serial terminal. You can use <a
+href="https://docs.zephyrproject.org/latest/services/shell/index.html">Zephyr’s
+shell subsystem</a> for this or simply read the commands on your
+own.</li>
+<li>Define the commands you need (and document them + display help
+texts) - Zephyr’s shell subsystem already supports all that, so you are
+highly encouraged to use this ;)</li>
+<li>Sanity checks: Always check that the fast update interval is faster
+than the slow interval.</li>
+<li><strong>Validate your input!</strong></li>
+</ul>
+<h2 id="get-creative-5-15p">Get creative (5-15P)</h2>
+<p>Come up with your own ideas and implement + document them. If you are
+not sure how many points you get for this, just ask.</p>

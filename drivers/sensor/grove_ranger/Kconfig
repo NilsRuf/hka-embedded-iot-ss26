@@ -1,0 +1,14 @@
+# This Kconfig option is used to enable the grove ultrasonic ranger.
+# In order to not have to define all those flags in prj.conf, we use DT_HAS_GROVE_RANGER_ENABLED.
+# This Kconfig flag is set during compile time after the devicetree has been parsed.
+# We depend our GROVE_RANGER on the presence of a "grove-ranger" compatible with status "okay" in
+# the devicetree.
+
+config GROVE_RANGER
+    bool "Grove Ultrasonic Ranger - Ultrasonic distance sensor"
+    default y
+    depends on DT_HAS_GROVE_RANGER_ENABLED
+    depends on GPIO
+    depends on SENSOR
+    help
+      Enable driver for Grove Ultrasonic Ranger.
