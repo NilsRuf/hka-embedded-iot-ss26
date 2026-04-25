@@ -75,6 +75,9 @@ Then implement a measurement channel that provides you with the latest measureme
 
 > We will also do this in class ;)
 
+1. Add a trigger channel, so you can request a sample on button press and when a timer expires
+2. Add a measurement channel where you can send the updated values.
+
 ## Relevant functions and APIs:
 - Define channel `ZBUS_CHAN_DEFINE(name, type, NULL, NULL, ZBUS_OBSERVERS_EMPTY, ZBUS_MSG_INIT(0));`
 - Declare channel `ZBUS_CHAN_DECLARE(name);`
