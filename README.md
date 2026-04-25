@@ -78,3 +78,7 @@ This document also describes how Zephyr builds and contains some useful knowledg
 
 After the course, you can prove your freshly learned skills to work on a final project.
 Details will be discussed in class.
+
+# Cheatsheet
+There is a [Zephyr cheat sheet](./doc/cheatsheet.md) which contains the most important Zephyr APIs
+as well as some useful links to documentation.
