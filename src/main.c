@@ -3,6 +3,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/uuid.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/sensor.h>
 #include <zephyr/kernel.h>
@@ -25,6 +26,64 @@ static const struct bt_data advertizing_data[] = {
 static const struct bt_data scan_data[] = {
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 };
+
+// Every service and characteristic needs a UUID. Define your own here.
+
+#define BT_UUID_TEMP_SERVICE_VAL                                                                   \
+    BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef0)
+
+#define BT_UUID_TEMP_VAL BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x5678, 0x1234, 0x56789abcdef1)
+
+// Then create the UUID structs for the BLE API.
+static struct bt_uuid_128 bt_uuid_temp_service = BT_UUID_INIT_128(BT_UUID_TEMP_SERVICE_VAL);
+static struct bt_uuid_128 bt_uuid_temp = BT_UUID_INIT_128(BT_UUID_TEMP_VAL);
+
+static atomic_t temp_value = ATOMIC_INIT(0);
+
+// This callback is executed when the client decides to enable/disable notifications for your
+// characteristic. You need one callback per notify characteristic!
+static void temp_ccc_changed(__maybe_unused const struct bt_gatt_attr *attr, uint16_t value)
+{
+    bool notifications_enabled = (value == BT_GATT_CCC_NOTIFY);
+    LOG_INF("Temperature notifications %s", notifications_enabled ? "enabled" : "disabled");
+}
+
+// Callback executed for regular read requests.
+static ssize_t read_temp(struct bt_conn *conn, const struct bt_gatt_attr *attr, void *buf,
+                         uint16_t len, uint16_t offset)
+{
+    const int16_t temp = (int16_t)atomic_get(&temp_value);
+    return bt_gatt_attr_read(conn, attr, buf, len, offset, &temp, sizeof(temp));
+}
+
+// Declare your service here
+// clang-format off
+BT_GATT_SERVICE_DEFINE(temp_svc,
+        BT_GATT_PRIMARY_SERVICE(&bt_uuid_temp_service),
+        BT_GATT_CHARACTERISTIC(&bt_uuid_temp.uuid,
+            BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+            BT_GATT_PERM_READ, read_temp, NULL, &temp_value),
+        BT_GATT_CCC(temp_ccc_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+);
+// clang-format on
+
+// Helper for sending notifications.
+static void notify_temp(int16_t new_value)
+{
+    (void)atomic_set(&temp_value, new_value);
+
+    // This actually sends the notification.
+    // We use &temp_svc.attrs[1] to access the characteristic value we need.
+    // For other notifications, the index changes accordingly.
+    int err = bt_gatt_notify(NULL,               /* NULL = all subscribed clients */
+                             &temp_svc.attrs[1], /* the characteristic attribute */
+                             &new_value, sizeof(new_value));
+    if (err == -ENOTCONN) {
+        /* No client connected / notifications not enabled — not an error */
+    } else if (err != 0) {
+        LOG_ERR("Notify failed: %d", err);
+    }
+}
 
 static const struct device *sensor = DEVICE_DT_GET(DT_NODELABEL(bmp280));
 
@@ -93,10 +152,6 @@ int main(void)
     LOG_INF("Advertising! :)");
 
     for (;;) {
-        if (atomic_get(&is_connected) == 1) {
-            k_sem_take(&advertize, K_FOREVER);
-        }
-
         err = sensor_sample_fetch(sensor);
         if (err != 0) {
             LOG_ERR("Failed to fetch sample: %d", err);
@@ -118,13 +173,18 @@ int main(void)
         }
         LOG_INF("Temperature: %d.%d°C -> %d", temp.val1, temp.val2, adv_temp);
 
-        manufacturer_data[2] = adv_temp >> 8;
-        manufacturer_data[3] = adv_temp & 0xFF;
+        atomic_set(&temp_value, adv_temp);
+        if (atomic_get(&is_connected) == 1) {
+            notify_temp(adv_temp);
+        } else {
+            manufacturer_data[2] = adv_temp >> 8;
+            manufacturer_data[3] = adv_temp & 0xFF;
 
-        err = bt_le_adv_update_data(advertizing_data, ARRAY_SIZE(advertizing_data), scan_data,
-                                    ARRAY_SIZE(scan_data));
-        if (err != 0) {
-            LOG_ERR("Failed to update advertizing data: %d", err);
+            err = bt_le_adv_update_data(advertizing_data, ARRAY_SIZE(advertizing_data), scan_data,
+                                        ARRAY_SIZE(scan_data));
+            if (err != 0) {
+                LOG_ERR("Failed to update advertizing data: %d", err);
+            }
         }
 
     sleep:
@@ -133,7 +193,7 @@ int main(void)
     return 0;
 }
 
-static void restart_advertizing(struct k_work *work)
+static void restart_advertizing(__maybe_unused struct k_work *work)
 {
     int err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, advertizing_data, ARRAY_SIZE(advertizing_data),
                               scan_data, ARRAY_SIZE(scan_data));
