@@ -74,7 +74,7 @@ Next up, we are defining a service to expose our measurement values.
 Our service, as well as each characteristic need _UUIDs_ that can be declared using
 ```c
 // Some random hex values...
-BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x1234, 0x1234, 0x123456789abc)
+const struct bt_uuid_128 = BT_UUID_INIT_128(BT_UUID_128_ENCODE(0x12345678, 0x1234, 0x1234, 0x1234, 0x123456789abc));
 ```
 
 You need to define callbacks for reading the data which calls:
