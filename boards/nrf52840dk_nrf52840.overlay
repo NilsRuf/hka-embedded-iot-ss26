@@ -1,11 +1,9 @@
 &i2c0 {
     status = "okay";
-    /*
         bmp280: bmp280@76 {
             compatible = "bosch,bme280";
             reg = <0x76>;
         };
-    */
 };
 
 /* Reconfigure the I2C pins for the BOSCH BMP280 sensor */
@@ -23,5 +21,32 @@
                 <NRF_PSEL(TWIM_SCL, 1, 15)>;
             low-power-enable;
         };
+    };
+};
+
+/* Define GPIO Hogs like this */
+&gpio0 {
+    status = "okay";
+
+    bosch_vdd_pin {
+        gpio-hog;
+        output-high;
+        gpios = <2 GPIO_ACTIVE_HIGH>;
+    };
+};
+
+&gpio1 {
+    status = "okay";
+
+    bosch_sdo_pin {
+        gpio-hog;
+        output-low;
+        gpios = <12 GPIO_ACTIVE_HIGH>;
+    };
+
+    bosch_cdb_pin {
+        gpio-hog;
+        output-high;
+        gpios = <13 GPIO_ACTIVE_HIGH>;
     };
 };
